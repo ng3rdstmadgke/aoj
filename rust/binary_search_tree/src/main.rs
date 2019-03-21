@@ -1,28 +1,28 @@
 use std::fmt::Write;
 use Node::{Nil, Cons};
-use std::cmp::PartialOrd;
 use std::fmt::Display;
 
 fn main() {
     let bst: BST<u32>  = BST::new();
 }
 
-enum Node<T: PartialOrd + Display> {
+#[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
+enum Node<T: Clone + Ord + PartialOrd + Eq + PartialEq + Display> {
     Nil,
     Cons(T, Box<Node<T>>, Box<Node<T>>),
 }
 
-struct BST<T: PartialOrd + Display> {
+struct BST<T: Clone + Ord + PartialOrd + Eq + PartialEq + Display> {
     root: Node<T>
 }
 
-impl<T: PartialOrd + Display> BST<T> {
+impl<T: Clone + Ord + PartialOrd + Eq + PartialEq + Display> BST<T> {
     fn new() -> BST<T> {
         BST { root: Nil }
     }
 
-    fn find(&self, target: T) -> bool {
-        self.root.find(target)
+    fn find(&mut self, target: T) -> bool {
+        self.root.find(target).is_some()
     }
 
     fn insert(&mut self, value: T) {
@@ -44,7 +44,7 @@ impl<T: PartialOrd + Display> BST<T> {
     }
 }
 
-impl<T: PartialOrd + Display> Node<T> {
+impl<T: Clone + Ord + PartialOrd + Eq + PartialEq + Display> Node<T> {
     fn insert(&mut self, value: T) {
         if let Cons(ref v, ref mut l, ref mut r) = *self {
             if value < *v {
@@ -57,19 +57,56 @@ impl<T: PartialOrd + Display> Node<T> {
         }
     }
 
-    fn find(&self, target: T) -> bool {
-        if let Cons(ref v, ref l, ref r) = *self {
+    fn find(&mut self, target: T) -> Option<*mut Self> {
+        if let Cons(ref v, ref mut l, ref mut r) = *self {
             if target < *v {
                 l.find(target)
             } else if target > *v {
                 r.find(target)
             } else {
-                true
+                Some(self as *mut Self)
             }
         } else {
-            false
+            None
         }
     }
+
+    fn delete(&mut self, target: T) {
+        if let Some(raw_ptr) = self.find(target) {
+            unsafe {
+                if let Cons(ref v, ref mut l, ref mut r) = *raw_ptr {
+                    if **l == Nil && **r == Nil {
+                        *raw_ptr = Nil;
+                    } else if **l == Nil {
+                        *raw_ptr = *r.clone();
+                    } else if **r == Nil {
+                        *raw_ptr = *l.clone();
+                    } else {
+                        if let Cons(ref cv, ref mut cl, ref mut cr) = **r {
+                            *raw_ptr = Cons(cv.clone(), *l, *r);
+                        }
+                    }
+                }
+            }
+
+        }
+
+    }
+
+    /*
+    fn sub(&mut self) {
+        if let Cons(ref v, ref mut l, ref mut r) = *self {
+            match (**l, **r) {
+                (Nil, Nil) => {
+                }
+                (Nil, _) | (_, Nil) => {
+                }
+                (_, Cons(ref vv, ref mut ll, ref mut rr)) => {
+                }
+            }
+        }
+    }
+    */
 
     fn preorder(&self, buf: &mut String) {
         if let Cons(ref v, ref l, ref r) = *self {
