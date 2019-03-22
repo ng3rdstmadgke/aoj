@@ -5,23 +5,23 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 fn main() {
-    let mut bst: BST<u32>  = BST::new();
-    let n: u32 = read();
+    let mut bst: BST<i32>  = BST::new();
+    let n: i32 = read();
     for _ in 0..n {
         let vec: Vec<String> = read_as_vec();
         let cmd: &str = &vec[0];
         if cmd == "insert" {
-            let key: u32 = vec[1].parse().ok().unwrap();
+            let key: i32 = vec[1].parse().ok().unwrap();
             bst.insert(key);
         } else if cmd == "find" {
-            let key: u32 = vec[1].parse().ok().unwrap();
+            let key: i32 = vec[1].parse().ok().unwrap();
             if bst.find(key) {
                 println!("yes");
             } else {
                 println!("no");
             }
         } else if cmd == "delete" {
-            let key: u32 = vec[1].parse().ok().unwrap();
+            let key: i32 = vec[1].parse().ok().unwrap();
             bst.delete(key);
         } else if cmd == "print" {
             println!(" {}", bst.inorder());
@@ -59,10 +59,8 @@ impl<T: Ord + PartialOrd + Eq + PartialEq + Display> BST<T> {
     }
 
     fn delete(&mut self, target: T) {
-        let ptr = &mut self.root as *mut Rc<RefCell<Node<T>>>;
-        if let Some((ptr, node)) = Node::find_for_delete(ptr, Rc::clone(& self.root), target) {
-            let mut node = node;
-            Node::delete(ptr, &mut node);
+        if let Some((ptr, node)) = Node::find_for_delete(&mut self.root, Rc::clone(& self.root), target) {
+            Node::delete(ptr, node);
         }
     }
 
@@ -128,8 +126,21 @@ impl<T: Ord + PartialOrd + Eq + PartialEq + Display> Node<T> {
         }
     }
 
+    fn find_next_node(ptr: *mut Rc<RefCell<Node<T>>>, node: Rc<RefCell<Node<T>>>) ->
+        Option<(*mut Rc<RefCell<Node<T>>>, Rc<RefCell<Node<T>>>)> {
+        if let Cons(_, ref mut l, _) = *node.borrow_mut() {
+            if *l.borrow() == Nil {
+                Some((ptr, Rc::clone(& node)))
+            } else {
+                Self::find_next_node(l, Rc::clone(l))
+            }
+        } else {
+            None
+        }
+    }
 
-    fn delete(ptr: *mut Rc<RefCell<Node<T>>>, node: &mut Rc<RefCell<Node<T>>>) {
+
+    fn delete(ptr: *mut Rc<RefCell<Node<T>>>, node: Rc<RefCell<Node<T>>>) {
         let replace: Option<Rc<RefCell<Node<T>>>> = match *node.borrow() {
             Cons(_, ref l, ref r) => {
                 if *l.borrow() == Nil && *r.borrow() == Nil {
@@ -150,11 +161,11 @@ impl<T: Ord + PartialOrd + Eq + PartialEq + Display> Node<T> {
             }
         } else {
             if let Cons(ref mut v, _, ref mut r) = *node.borrow_mut() {
-                if let Cons(ref cv, ..) = *r.borrow() {
+                let (next_ptr, next_node) = Self::find_next_node(r, Rc::clone(r)).unwrap();
+                if let Cons(ref cv, ..) = *next_node.borrow() {
                     *v = Rc::clone(cv);
                 }
-                let ptr = r as *mut Rc<RefCell<Node<T>>>;
-                Node::delete(ptr, r);
+                Node::delete(next_ptr, next_node);
             }
         }
     }
@@ -305,5 +316,36 @@ mod tests {
         bst.delete(8);
         assert_eq!("1 2 3 7 22".to_string(), bst.inorder());
         assert_eq!("22 2 1 3 7".to_string(), bst.preorder());
+    }
+
+    #[test]
+    fn test_bst_6() {
+        let mut bst: BST<i32> = BST::new();
+        bst.insert(30);
+        bst.insert(17);
+        bst.insert(88);
+        bst.insert(53);
+        bst.insert(5);
+        bst.insert(20);
+        bst.insert(18);
+        bst.insert(28);
+        bst.insert(27);
+        bst.insert(60);
+        bst.insert(2000000000);
+        bst.insert(55);
+        bst.insert(63);
+        bst.insert(-1);
+        bst.insert(8);
+        bst.delete(53);
+        assert_eq!("-1 5 8 17 18 20 27 28 30 55 60 63 88 2000000000".to_string(), bst.inorder());
+        bst.delete(2000000000);
+        assert_eq!("-1 5 8 17 18 20 27 28 30 55 60 63 88".to_string(), bst.inorder());
+        bst.delete(20);
+        assert_eq!("-1 5 8 17 18 27 28 30 55 60 63 88".to_string(), bst.inorder());
+        bst.delete(5);
+        assert_eq!("-1 8 17 18 27 28 30 55 60 63 88".to_string(), bst.inorder());
+        bst.delete(8);
+        assert_eq!("-1 17 18 27 28 30 55 60 63 88".to_string(), bst.inorder());
+        assert_eq!("30 17 -1 27 18 28 88 60 55 63".to_string(), bst.preorder());
     }
 }
