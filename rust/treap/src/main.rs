@@ -54,58 +54,51 @@ impl Treap {
         Self::_insert(&mut self.root, key, pri);
     }
 
-    fn _insert(node_ptr: &mut Option<Box<Node>>, key: u32, pri: u32) {
-        if let Some(ref mut node) = node_ptr {
-            if key < node.key {
-                Self::_insert(&mut node.left, key, pri);
-                if node.pri < node.left.as_ref().unwrap().pri {
-                    Self::right_rotate(node_ptr);
-                    /*
-                    let mut left: Option<Box<Node>> = mem::replace(&mut node.left, None);
-                    node.left = mem::replace(&mut left.as_mut().unwrap().right, None);
-                    left.as_mut().unwrap().right =  mem::replace(node_ptr, None);
-                    *node_ptr = left;
-                    */
+    /// 葉にノードを挿入して、挿入したノードを適切な位置まで回転して移動させる
+    fn _insert(node: &mut Option<Box<Node>>, key: u32, pri: u32) {
+        if let Some(ref mut unwraped) = node {
+            if key < unwraped.key {
+                Self::_insert(&mut unwraped.left, key, pri);
+                if unwraped.pri < unwraped.left.as_ref().unwrap().pri {
+                    Self::right_rotate(node);
                 }
-            } else if key > node.key {
-                Self::_insert(&mut node.right, key, pri);
-                if node.pri < node.right.as_ref().unwrap().pri {
-                    Self::left_rotate(node_ptr);
-                    /*
-                    let mut right: Option<Box<Node>> = mem::replace(&mut node.right, None);
-                    node.right = mem::replace(&mut right.as_mut().unwrap().left, None);
-                    right.as_mut().unwrap().left = mem::replace(node_ptr, None);
-                    *node_ptr = right;
-                    */
+            } else if key > unwraped.key {
+                Self::_insert(&mut unwraped.right, key, pri);
+                if unwraped.pri < unwraped.right.as_ref().unwrap().pri {
+                    Self::left_rotate(node);
                 }
             }
         } else {
-            *node_ptr = Some(Box::new(Node { key: key, pri: pri, left: None, right: None }));
+            *node = Some(Box::new(Node { key: key, pri: pri, left: None, right: None }));
         }
     }
 
     /// 右回転(左の子が親になる)
-    fn right_rotate(node_ptr: &mut Option<Box<Node>>) {
-        let node = node_ptr.as_mut().unwrap();
-        let mut left: Option<Box<Node>> = mem::replace(&mut node.left, None);
-        // 親の左の子に、左の子の右の子をつける
-        node.left = mem::replace(&mut left.as_mut().unwrap().right, None);
-        // 左の子の右の子に、親をつける
-        left.as_mut().unwrap().right =  mem::replace(node_ptr, None);
+    fn right_rotate(node: &mut Option<Box<Node>>) {
+        let unwraped: &mut Box<Node> = node.as_mut().unwrap();
+        let mut left: Option<Box<Node>> = mem::replace(&mut unwraped.left, None);
+        if let Some(ref mut left) = left {
+            // 親の左の子に、左の子の右の子をつける
+            unwraped.left = mem::replace(&mut left.right, None);
+            // 左の子の右の子に、親をつける
+            left.right =  mem::replace(node, None);
+        }
         // 親の位置に左の子を持ってくる
-        *node_ptr = left;
+        *node = left;
     }
 
     /// 左回転(右の子が親になる)
-    fn left_rotate(node_ptr: &mut Option<Box<Node>>) {
-        let node = node_ptr.as_mut().unwrap();
-        let mut right: Option<Box<Node>> = mem::replace(&mut node.right, None);
-        // 親の右の子に、右の子の左の子をつける
-        node.right = mem::replace(&mut right.as_mut().unwrap().left, None);
-        // 右の子の左の子に、親をつける
-        right.as_mut().unwrap().left = mem::replace(node_ptr, None);
+    fn left_rotate(node: &mut Option<Box<Node>>) {
+        let unwraped: &mut Box<Node> = node.as_mut().unwrap();
+        let mut right: Option<Box<Node>> = mem::replace(&mut unwraped.right, None);
+        if let Some(ref mut right) = right {
+            // 親の右の子に、右の子の左の子をつける
+            unwraped.right = mem::replace(&mut right.left, None);
+            // 右の子の左の子に、親をつける
+            right.left = mem::replace(node, None);
+        }
         // 親の位置に右の子を持ってくる
-        *node_ptr = right;
+        *node = right;
     }
 
 
@@ -126,8 +119,49 @@ impl Treap {
         sub(&self.root, key)
     }
 
+    /// 削除したいノードを葉まで持っていって削除
     fn delete(&mut self, key: u32) {
+        Self::_delete(&mut self.root, key);
     }
+
+    fn _delete(node: &mut Option<Box<Node>>, key: u32) {
+        if let Some(ref mut unwraped) = node {
+            if key < unwraped.key {
+                Self::_delete(&mut unwraped.left, key);
+            } else if key > unwraped.key {
+                Self::_delete(&mut unwraped.right, key);
+            } else {
+                Self::__delete(node);
+            }
+        }
+    }
+
+    fn __delete(node: &mut Option<Box<Node>>) {
+        if let Some(ref mut unwraped) = node {
+            if unwraped.left.is_some() && unwraped.right.is_some() {
+                if unwraped.left.as_ref().unwrap().pri > unwraped.right.as_ref().unwrap().pri {
+                    Self::right_rotate(node);
+                    // 右回転すると消したいノードは右の子になる
+                    Self::__delete(&mut node.as_mut().unwrap().right);
+                } else {
+                    Self::left_rotate(node);
+                    // 左回転すると消したいノードは左の子になる
+                    Self::__delete(&mut node.as_mut().unwrap().left);
+                }
+            } else if unwraped.left.is_some() {
+                Self::right_rotate(node);
+                // 右回転すると消したいノードは右の子になる
+                Self::__delete(&mut node.as_mut().unwrap().right);
+            } else if unwraped.right.is_some() {
+                Self::left_rotate(node);
+                // 左回転すると消したいノードは左の子になる
+                Self::__delete(&mut node.as_mut().unwrap().left);
+            } else {
+                *node = None;
+            }
+        }
+    }
+
 
     fn preorder(&self) -> String {
         fn sub(node: &Option<Box<Node>>, buf: &mut String) {
@@ -181,8 +215,65 @@ mod tests {
         treap.insert(20, 99);
         treap.insert(10, 50);
         treap.insert(30, 80);
-        //assert_eq!(String::from("10 20 30"), treap.inorder());
-        //assert_eq!(String::from("20 10 30"), treap.preorder());
+        assert_eq!(String::from("10 20 30"), treap.inorder());
+        assert_eq!(String::from("20 10 30"), treap.preorder());
+    }
+
+    #[test]
+    fn test_insert_1_2() {
+        let mut treap = Treap::new();
+        treap.insert(20, 99);
+        treap.insert(10, 50);
+        treap.insert(30, 80);
+        treap.delete(10);
+        assert_eq!(String::from("20 30"), treap.inorder());
+        assert_eq!(String::from("20 30"), treap.preorder());
+    }
+
+    #[test]
+    fn test_insert_1_3() {
+        let mut treap = Treap::new();
+        treap.insert(20, 99);
+        treap.insert(10, 50);
+        treap.insert(30, 80);
+        treap.delete(30);
+        assert_eq!(String::from("10 20"), treap.inorder());
+        assert_eq!(String::from("20 10"), treap.preorder());
+    }
+
+    #[test]
+    fn test_insert_1_4() {
+        let mut treap = Treap::new();
+        treap.insert(20, 99);
+        treap.insert(10, 50);
+        treap.insert(30, 80);
+        treap.insert(5, 30);
+        treap.delete(10);
+        assert_eq!(String::from("5 20 30"), treap.inorder());
+        assert_eq!(String::from("20 5 30"), treap.preorder());
+    }
+
+    #[test]
+    fn test_insert_1_5() {
+        let mut treap = Treap::new();
+        treap.insert(20, 99);
+        treap.insert(10, 50);
+        treap.insert(30, 80);
+        treap.insert(40, 30);
+        treap.delete(30);
+        assert_eq!(String::from("10 20 40"), treap.inorder());
+        assert_eq!(String::from("20 10 40"), treap.preorder());
+    }
+
+    #[test]
+    fn test_insert_1_6() {
+        let mut treap = Treap::new();
+        treap.insert(20, 99);
+        treap.insert(10, 50);
+        treap.insert(30, 80);
+        treap.delete(20);
+        assert_eq!(String::from("10 30"), treap.inorder());
+        assert_eq!(String::from("30 10"), treap.preorder());
     }
 
     #[test]
@@ -250,5 +341,74 @@ mod tests {
         assert_eq!(true, treap.find(86));
         assert_eq!(true, treap.find(6));
         assert_eq!(false, treap.find(10));
+    }
+
+    #[test]
+    fn test_insert_6() {
+        let mut treap = Treap::new();
+        treap.insert(35, 99);
+        treap.insert(3 , 80);
+        treap.insert(1 , 53);
+        treap.insert(14, 25);
+        treap.insert(7 , 10);
+        treap.insert(21, 12);
+        treap.insert(80, 76);
+        treap.insert(42, 3);
+        treap.insert(86, 47);
+        treap.insert(6, 90);
+        treap.delete(35);
+        treap.delete(99);
+        assert_eq!(String::from("6 3 1 80 14 7 21 42 86"), treap.preorder());
+        assert_eq!(String::from("1 3 6 7 14 21 42 80 86"), treap.inorder());
+    }
+    #[test]
+    fn test_insert_7() {
+        let mut treap = Treap::new();
+        treap.insert(53, 86);
+        treap.insert(180, 1);
+        treap.insert(100, 20);
+        treap.insert(108, 70);
+        treap.insert(20, 50);
+        treap.insert(10, 25);
+        treap.insert(18, 100);
+        treap.insert(5, 10);
+        treap.insert(13, 71);
+        treap.insert(14, 8);
+        treap.insert(16, 120);
+        treap.insert(15, 3);
+        treap.insert(12, 17);
+        treap.insert(2, 2);
+        assert_eq!(String::from("2 5 10 12 13 14 15 16 18 20 53 100 108 180"), treap.inorder());
+        assert_eq!(String::from("16 13 10 5 2 12 14 15 18 53 20 108 100 180"), treap.preorder());
+    }
+    #[test]
+    fn test_insert_8() {
+        let mut treap = Treap::new();
+        treap.insert(53, 86);
+        treap.insert(180, 1);
+        treap.insert(100, 20);
+        treap.insert(108, 70);
+        treap.insert(20, 50);
+        treap.insert(10, 25);
+        treap.insert(18, 100);
+        treap.insert(5, 10);
+        treap.insert(13, 71);
+        treap.insert(14, 8);
+        treap.insert(16, 120);
+        treap.insert(15, 3);
+        treap.insert(12, 17);
+        treap.insert(2, 2);
+        treap.delete(13);
+        assert_eq!(String::from("2 5 10 12 14 15 16 18 20 53 100 108 180"), treap.inorder());
+        assert_eq!(String::from("16 10 5 2 12 14 15 18 53 20 108 100 180"), treap.preorder());
+        treap.delete(18);
+        assert_eq!(String::from("2 5 10 12 14 15 16 20 53 100 108 180"), treap.inorder());
+        assert_eq!(String::from("16 10 5 2 12 14 15 53 20 108 100 180"), treap.preorder());
+        treap.delete(16);
+        assert_eq!(String::from("2 5 10 12 14 15 20 53 100 108 180"), treap.inorder());
+        assert_eq!(String::from("53 20 10 5 2 12 14 15 108 100 180"), treap.preorder());
+        treap.delete(53);
+        assert_eq!(String::from("2 5 10 12 14 15 20 100 108 180"), treap.inorder());
+        assert_eq!(String::from("108 20 10 5 2 12 14 15 100 180"), treap.preorder());
     }
 }
